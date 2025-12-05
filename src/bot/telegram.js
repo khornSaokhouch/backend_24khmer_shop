@@ -1,12 +1,7 @@
 const TelegramBot = require("node-telegram-bot-api");
 const { handleStart } = require("../controllers/AuthController");
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
-  webHook: true,
-});
-
-// Set webhook URL
-bot.setWebHook(`${process.env.BASE_URL}/bot${process.env.TELEGRAM_BOT_TOKEN}`);
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { webHook: true });
 
 // /start command
 bot.onText(/\/start/, async (msg) => {
