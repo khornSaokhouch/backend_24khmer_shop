@@ -40,7 +40,7 @@ const handleStart = async (user, botInstance, chatId) => {
         const imageName = `${telegramId}.jpg`;
         fs.writeFileSync(path.join(publicFolder, imageName), response.data);
 
-        const baseUrl = process.env.BASE_URL || "http://localhost:3000";
+        const baseUrl = process.env.BASE_URL;
         const publicPath = process.env.PUBLIC_URL || "/public";
         publicImageUrl = `${baseUrl}${publicPath}/users/${imageName}`;
       }
