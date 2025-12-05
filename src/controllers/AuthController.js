@@ -77,13 +77,14 @@ const handleStart = async (user, botInstance, chatId) => {
             {
               text: "Open App",
               web_app: {
-                url: `${process.env.BASE_URL}/login?telegram_id=${chatId}`,
+                url: `${process.env.FRONTEND_URL}/login?telegram_id=${chatId}`,
               },
             },
           ],
         ],
       },
     });
+    
     
 
     console.log("WebApp button sent to user:", chatId);
