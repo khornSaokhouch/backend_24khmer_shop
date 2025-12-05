@@ -70,7 +70,6 @@ const handleStart = async (user, botInstance, chatId) => {
 
     await botInstance.sendMessage(chatId, message);
 
-    // --- Send single WebApp button ---
     await botInstance.sendMessage(chatId, "Open the app to login and order:", {
       reply_markup: {
         inline_keyboard: [
@@ -78,13 +77,14 @@ const handleStart = async (user, botInstance, chatId) => {
             {
               text: "Open App",
               web_app: {
-                url: `https://forntend-24khmer-shop.vercel.app/login?telegram_id=${chatId}`,
+                url: `${process.env.BASE_URL}/login?telegram_id=${chatId}`,
               },
             },
           ],
         ],
       },
     });
+    
 
     console.log("WebApp button sent to user:", chatId);
   } catch (error) {
