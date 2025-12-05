@@ -9,7 +9,12 @@ require("./bot/telegram");
 const routes = require("./routes");
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://forntend-24khmer-shop.vercel.app",
+    credentials: true,
+  })
+);
 app.use(express.json()); // Parse JSON bodies
 
 // Serve public folder
