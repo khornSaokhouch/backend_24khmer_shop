@@ -19,6 +19,7 @@ coverage/
 
 # Optional npm cache directory
 .npm/
+.public
 
 # Optional eslint cache
 .eslintcache
