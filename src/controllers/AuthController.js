@@ -5,6 +5,7 @@ const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const otpStore = require("../utils/otpStore");
 const crypto = require("crypto");
+const { uploadImage } = require("../utils/cloudinary");
 
 // Generate 6-digit OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
@@ -18,32 +19,26 @@ const handleStart = async (user, botInstance, chatId) => {
     let existingUser = await User.findOne({ telegram_id: telegramId });
 
     let imagePath = existingUser?.image || null;
-    let storedFilename = existingUser?.image ? path.basename(existingUser.image) : null;
 
-    // Get user’s telegram avatar
+    // Get user's Telegram profile photo
     const photos = await botInstance.getUserProfilePhotos(user.id, { limit: 1 });
     if (photos.total_count > 0) {
-
       const fileId = photos.photos[0][0].file_id;
       const file = await botInstance.getFile(fileId);
       const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
 
-      // DOWNLOAD
+      // Download image as buffer
       const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
+      const buffer = Buffer.from(response.data, "binary");
 
-      const uploadPath = path.join(process.cwd(), "public/users");
-      if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
-
-      storedFilename = `user_${telegramId}.jpg`;
-
-      // save
-      fs.writeFileSync(path.join(uploadPath, storedFilename), response.data);
-
-      // store RELATIVE path like event image 👍
-      imagePath = `users/${storedFilename}`;
+      // Upload to Cloudinary
+      const result = await uploadImage(buffer, "users", `user_${telegramId}`);
+      if (result && result.secure_url) {
+        imagePath = result.secure_url; // store Cloudinary URL
+      }
     }
 
-    // SAVE USER
+    // Save or update user
     existingUser = await User.findOneAndUpdate(
       { telegram_id: telegramId },
       {
@@ -52,7 +47,7 @@ const handleStart = async (user, botInstance, chatId) => {
         last_name: user.last_name,
         username: user.username,
         language_code: user.language_code,
-        image: imagePath, 
+        image: imagePath,
         role: existingUser?.role || "user",
       },
       { upsert: true, new: true }
@@ -62,8 +57,10 @@ const handleStart = async (user, botInstance, chatId) => {
       ? `${user.first_name} ${user.last_name}`
       : user.first_name;
 
+    // Send greeting message
     await botInstance.sendMessage(chatId, `👋 Hi ${fullName}! Profile synced.`);
 
+    // Send WebApp button
     await botInstance.sendMessage(chatId, "Open WebApp 👇", {
       reply_markup: {
         inline_keyboard: [
@@ -78,13 +75,16 @@ const handleStart = async (user, botInstance, chatId) => {
         ]
       }
     });
+    
 
     console.log("Saved user profile:", existingUser);
 
   } catch (error) {
-    console.error("handleStart error:", error);
-    botInstance.sendMessage(chatId, "⚠️ Something went wrong!");
+    console.error("handleStart error:", error.message); // log error message
+    console.error(error); // full stack trace
+    await botInstance.sendMessage(chatId, "⚠️ Something went wrong!");
   }
+  
 };
 
 

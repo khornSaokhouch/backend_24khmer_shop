@@ -19,7 +19,6 @@ coverage/
 
 # Optional npm cache directory
 .npm/
-.public
 
 # Optional eslint cache
 .eslintcache
@@ -44,3 +43,6 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# Public folder
+public/
