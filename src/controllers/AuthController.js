@@ -14,42 +14,37 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 // ------------------------------------
 const handleStart = async (user, botInstance, chatId) => {
   try {
-    console.log("handleStart called for user:", user);
-
     const telegramId = user.id.toString();
-    const existingUser = await User.findOne({ telegram_id: telegramId });
+    let existingUser = await User.findOne({ telegram_id: telegramId });
 
-    let publicImageUrl = existingUser?.image || null;
+    let imagePath = existingUser?.image || null;
+    let storedFilename = existingUser?.image ? path.basename(existingUser.image) : null;
 
-    // Save Telegram profile photo
-    if (!existingUser || !publicImageUrl) {
-      const photos = await botInstance.getUserProfilePhotos(user.id, {
-        limit: 1,
-      });
+    // Get user’s telegram avatar
+    const photos = await botInstance.getUserProfilePhotos(user.id, { limit: 1 });
+    if (photos.total_count > 0) {
 
-      if (photos.total_count > 0) {
-        const fileId = photos.photos[0][0].file_id;
-        const file = await botInstance.getFile(fileId);
-        const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+      const fileId = photos.photos[0][0].file_id;
+      const file = await botInstance.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
 
-        const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
+      // DOWNLOAD
+      const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
 
-        const publicFolder = path.join(__dirname, "../../public/users");
-        if (!fs.existsSync(publicFolder)) fs.mkdirSync(publicFolder, { recursive: true });
+      const uploadPath = path.join(process.cwd(), "public/users");
+      if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
 
-        const imageName = `${telegramId}.jpg`;
-        fs.writeFileSync(path.join(publicFolder, imageName), response.data);
+      storedFilename = `user_${telegramId}.jpg`;
 
-        // Use backend URL
-        const backendUrl = process.env.BACKEND_URL;
-        const publicPath = process.env.PUBLIC_URL || "/public";
+      // save
+      fs.writeFileSync(path.join(uploadPath, storedFilename), response.data);
 
-        publicImageUrl = `${backendUrl}${publicPath}/users/${imageName}`;
-      }
+      // store RELATIVE path like event image 👍
+      imagePath = `users/${storedFilename}`;
     }
 
-    // Save user in DB
-    const savedUser = await User.findOneAndUpdate(
+    // SAVE USER
+    existingUser = await User.findOneAndUpdate(
       { telegram_id: telegramId },
       {
         telegram_id: telegramId,
@@ -57,42 +52,41 @@ const handleStart = async (user, botInstance, chatId) => {
         last_name: user.last_name,
         username: user.username,
         language_code: user.language_code,
-        image: publicImageUrl,
+        image: imagePath, 
         role: existingUser?.role || "user",
       },
       { upsert: true, new: true }
     );
 
-    const fullName = user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name;
+    const fullName = user.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user.first_name;
 
-    const message = existingUser
-      ? `👋 Welcome back, ${fullName}! Your profile is already stored.`
-      : `🎉 Hi ${fullName}! Your profile has been saved successfully.`;
+    await botInstance.sendMessage(chatId, `👋 Hi ${fullName}! Profile synced.`);
 
-    await botInstance.sendMessage(chatId, message);
-
-    // Send WebApp button (Frontend URL)
-    await botInstance.sendMessage(chatId, "Open the app to login and order:", {
+    await botInstance.sendMessage(chatId, "Open WebApp 👇", {
       reply_markup: {
         inline_keyboard: [
           [
             {
               text: "Open App",
               web_app: {
-                url: `${process.env.FRONTEND_URL}/login?telegram_id=${chatId}`,
-              },
-            },
-          ],
-        ],
-      },
+                url: `${process.env.FRONTEND_URL}/login?telegram_id=${chatId}`
+              }
+            }
+          ]
+        ]
+      }
     });
 
-    console.log("WebApp button sent to user:", chatId);
+    console.log("Saved user profile:", existingUser);
+
   } catch (error) {
     console.error("handleStart error:", error);
-    botInstance.sendMessage(chatId, "⚠️ Something went wrong while storing your profile.");
+    botInstance.sendMessage(chatId, "⚠️ Something went wrong!");
   }
 };
+
 
 // ------------------------------------
 // Send OTP
