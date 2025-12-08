@@ -12,7 +12,10 @@ const CategorySchema = new mongoose.Schema(
       required: true,
     },
     image: {
-      type: String, // optional image URL
+      type: String, // Cloudinary URL
+    },
+    image_id: {
+      type: String, // Cloudinary public_id
     },
   },
   { timestamps: true } // createdAt and updatedAt

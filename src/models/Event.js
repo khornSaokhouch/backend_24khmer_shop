@@ -22,7 +22,10 @@ const EventSchema = new mongoose.Schema(
       type: Date,
     },
     event_image: {
-      type: String, // store public URL
+      type: String, // Cloudinary URL
+    },
+    image_id: {
+      type: String, // Cloudinary public_id (for deletion)
     },
   },
   { timestamps: true }

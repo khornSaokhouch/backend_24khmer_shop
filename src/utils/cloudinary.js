@@ -1,4 +1,3 @@
-// utils/cloudinary.js
 const cloudinary = require("cloudinary").v2;
 
 cloudinary.config({
@@ -21,4 +20,14 @@ const uploadImage = (fileBuffer, folder = "users", publicId = null) => {
   });
 };
 
-module.exports = { uploadImage };
+// Delete image by public_id
+const deleteImage = (publicId) => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.destroy(publicId, (error, result) => {
+      if (error) return reject(error);
+      resolve(result);
+    });
+  });
+};
+
+module.exports = { uploadImage, deleteImage };

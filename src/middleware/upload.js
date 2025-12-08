@@ -1,54 +1,32 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 /**
  * Reusable Multer upload middleware
- * @param {string} folderName - Folder under 'public' to save files
+ * @param {string} folderName - Cloudinary folder (we still accept for compatibility)
  * @param {string} type - "images", "documents", or "all"
  */
 const upload = (folderName, type = "all") => {
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const uploadFolder = path.join(__dirname, "../../public", folderName);
+  const storage = multer.memoryStorage(); // <-- IMPORTANT
 
-      // Auto-create folder if it doesn't exist
-      if (!fs.existsSync(uploadFolder)) {
-        fs.mkdirSync(uploadFolder, { recursive: true });
-      }
-
-      cb(null, uploadFolder);
-    },
-    filename: (req, file, cb) => {
-      // Create unique filename: fieldname-timestamp-originalname
-      const ext = path.extname(file.originalname).toLowerCase();
-      const baseName = path.basename(file.originalname, ext)
-        .replace(/\s+/g, "-")
-        .toLowerCase();
-      const name = `${file.fieldname}-${Date.now()}-${baseName}${ext}`;
-      cb(null, name);
-    },
-  });
-
-  // Filter files based on type
   const fileFilter = (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const mimetype = file.mimetype;
 
-    const imageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
-    const documentExt = [".pdf", ".doc", ".docx"];
-
-    if (type === "images" && !imageExt.includes(ext)) {
+    if (type === "images" && !mimetype.startsWith("image/")) {
       return cb(new Error("Only image files are allowed"), false);
     }
 
-    if (type === "documents" && !documentExt.includes(ext)) {
+    if (type === "documents" && !mimetype.includes("pdf") && !mimetype.includes("word")) {
       return cb(new Error("Only PDF/DOC files are allowed"), false);
     }
 
     cb(null, true);
   };
 
-  const uploader = multer({ storage, fileFilter });
+  const uploader = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  });
 
   return {
     single: (field) => uploader.single(field),

@@ -1,12 +1,11 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer"); // <-- missing import
 const categoryController = require("../controllers/categoryController");
 const auth = require("../middleware/auth");
 const upload = require("../middleware/upload");
 
-// ---------------- Routes ----------------
-
-// Create category (only images allowed)
+// Create category
 router.post(
   "/",
   auth,
@@ -14,13 +13,13 @@ router.post(
   categoryController.createCategory
 );
 
-// Get all categories
+// Get all
 router.get("/", categoryController.getAllCategories);
 
-// Get categories by user ID
+// Get by user
 router.get("/:user_id", auth, categoryController.getCategoryByUserId);
 
-// Update category (only images allowed)
+// Update
 router.put(
   "/:id",
   auth,
@@ -28,10 +27,10 @@ router.put(
   categoryController.updateCategory
 );
 
-// Delete category
+// Delete
 router.delete("/:id", auth, categoryController.deleteCategory);
 
-// ---------------- Error handling for multer ----------------
+// Multer error handler
 router.use((err, req, res, next) => {
   if (
     err instanceof multer.MulterError ||

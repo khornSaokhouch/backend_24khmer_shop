@@ -1,7 +1,6 @@
 const Event = require("../models/Event");
-const fs = require("fs");
-const path = require("path");
 const mongoose = require("mongoose");
+const { uploadImage, deleteImage } = require("../utils/cloudinary");
 
 // ----------------- Create Event -----------------
 exports.createEvent = async (req, res) => {
@@ -10,9 +9,12 @@ exports.createEvent = async (req, res) => {
     const { name, description, start_date, end_date } = req.body;
 
     let eventImage = null;
+    let imageId = null;
 
     if (req.file) {
-      eventImage = `events/${req.file.filename}`; // <== Relative path only
+      const result = await uploadImage(req.file.buffer, "events");
+      eventImage = result.secure_url;
+      imageId = result.public_id;
     }
 
     const newEvent = await Event.create({
@@ -22,17 +24,12 @@ exports.createEvent = async (req, res) => {
       start_date,
       end_date,
       event_image: eventImage,
+      image_id: imageId,
     });
 
     res.status(201).json(newEvent);
   } catch (err) {
     console.error("createEvent error:", err);
-
-    if (req.file) {
-      const filePath = path.join(process.cwd(), "public", "events", req.file.filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-
     res.status(400).json({ message: err.message });
   }
 };
@@ -43,6 +40,7 @@ exports.getAllEvents = async (req, res) => {
     const events = await Event.find().populate("user_id", "telegram_id first_name last_name username");
     res.json(events);
   } catch (err) {
+    console.error("getAllEvents error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -60,6 +58,7 @@ exports.getEventById = async (req, res) => {
 
     res.json(event);
   } catch (err) {
+    console.error("getEventById error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -78,11 +77,14 @@ exports.updateEvent = async (req, res) => {
     const { name, description, start_date, end_date } = req.body;
 
     if (req.file) {
-      if (event.event_image) {
-        const oldPath = path.join(process.cwd(), "public", event.event_image);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      // Delete old image from Cloudinary if exists
+      if (event.image_id) {
+        await deleteImage(event.image_id);
       }
-      event.event_image = `events/${req.file.filename}`;
+
+      const result = await uploadImage(req.file.buffer, "events");
+      event.event_image = result.secure_url;
+      event.image_id = result.public_id;
     }
 
     event.name = name || event.name;
@@ -94,11 +96,7 @@ exports.updateEvent = async (req, res) => {
 
     res.json(event);
   } catch (err) {
-    if (req.file) {
-      const filePath = path.join(process.cwd(), "public", "events", req.file.filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
-
+    console.error("updateEvent error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -111,16 +109,19 @@ exports.deleteEvent = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id))
       return res.status(400).json({ message: "Invalid event ID" });
 
-    const event = await Event.findByIdAndDelete(id);
+    const event = await Event.findById(id);
     if (!event) return res.status(404).json({ message: "Event not found" });
 
-    if (event.event_image) {
-      const imagePath = path.join(process.cwd(), "public", event.event_image);
-      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+    // Delete image from Cloudinary if exists
+    if (event.image_id) {
+      await deleteImage(event.image_id);
     }
+
+    await Event.findByIdAndDelete(id);
 
     res.json({ message: "Event deleted successfully" });
   } catch (err) {
+    console.error("deleteEvent error:", err);
     res.status(500).json({ message: err.message });
   }
 };

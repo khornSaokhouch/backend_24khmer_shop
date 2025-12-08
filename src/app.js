@@ -24,7 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // ---------------- Serve Static Files ----------------
 // Serve the 'public' folder at root
 // Now URL http://localhost:3000/events/filename.jpg will work
-app.use(express.static(path.join(__dirname, "../public")));
+// app.use(express.static(path.join(__dirname, "../public")));
 
 
 // ---------------- API Routes ----------------
@@ -43,7 +43,6 @@ connectDB();
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API running on port ${PORT}`);
-  console.log(`Public folder served at http://localhost:${PORT}/`);
 
   // Set Telegram webhook after server is running
   bot.setWebHook(`${process.env.BACKEND_URL}/bot${process.env.TELEGRAM_BOT_TOKEN}`);
