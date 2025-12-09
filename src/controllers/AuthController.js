@@ -1,11 +1,9 @@
 const User = require("../models/User");
-const fs = require("fs");
-const path = require("path");
 const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const otpStore = require("../utils/otpStore");
-const crypto = require("crypto");
 const { uploadImage } = require("../utils/cloudinary");
+const { addTokenToBlacklist } = require("../utils/tokenBlacklist");
 
 // Generate 6-digit OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
@@ -160,4 +158,20 @@ const verifyOtp = async (req, res) => {
   }
 };
 
-module.exports = { handleStart, sendOtp, verifyOtp };
+const logoutUser = (req, res) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({ success: false, message: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  // Add token to blacklist
+  addTokenToBlacklist(token);
+
+  return res.json({ success: true, message: "Logged out successfully" });
+};
+
+
+module.exports = { handleStart, sendOtp, verifyOtp, logoutUser };

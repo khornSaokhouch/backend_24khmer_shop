@@ -1,10 +1,16 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { isTokenBlacklisted } = require("../utils/tokenBlacklist");
 
 const auth = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1]; // Expect "Bearer <token>"
+    const token = req.headers.authorization?.split(" ")[1]; // "Bearer <token>"
     if (!token) return res.status(401).json({ success: false, message: "No token provided" });
+
+    // Check if token is blacklisted
+    if (isTokenBlacklisted(token)) {
+      return res.status(401).json({ success: false, message: "Token has been invalidated. Please login again." });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret_key");
 
