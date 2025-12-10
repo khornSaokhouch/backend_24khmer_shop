@@ -9,7 +9,7 @@ const upload = require("../middleware/upload");
 router.post(
   "/",
   auth,
-  upload("categories", "images").single("image"),
+  upload("categories", "images").single("category_image"), // match frontend
   categoryController.createCategory
 );
 
@@ -23,7 +23,7 @@ router.get("/:user_id", auth, categoryController.getCategoryByUserId);
 router.put(
   "/:id",
   auth,
-  upload("categories", "images").single("image"),
+  upload("categories", "images").single("category_image"), // match frontend
   categoryController.updateCategory
 );
 
