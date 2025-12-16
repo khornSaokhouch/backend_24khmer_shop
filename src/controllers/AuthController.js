@@ -14,25 +14,34 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 const handleStart = async (user, botInstance, chatId) => {
   try {
     const telegramId = user.id.toString();
-    let existingUser = await User.findOne({ telegram_id: telegramId });
+    
+    // Show a "typing..." status for better UX while processing
+    await botInstance.sendChatAction(chatId, "typing");
 
+    let existingUser = await User.findOne({ telegram_id: telegramId });
     let imagePath = existingUser?.image || null;
 
     // Get user's Telegram profile photo
     const photos = await botInstance.getUserProfilePhotos(user.id, { limit: 1 });
-    if (photos.total_count > 0) {
-      const fileId = photos.photos[0][0].file_id;
-      const file = await botInstance.getFile(fileId);
-      const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+    
+    // Only fetch/upload photo if user is new or doesn't have an image
+    if (photos.total_count > 0 && !imagePath) {
+      try {
+        const fileId = photos.photos[0][0].file_id;
+        const file = await botInstance.getFile(fileId);
+        const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
 
-      // Download image as buffer
-      const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
-      const buffer = Buffer.from(response.data, "binary");
+        // Download image as buffer
+        const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
+        const buffer = Buffer.from(response.data, "binary");
 
-      // Upload to Cloudinary
-      const result = await uploadImage(buffer, "users", `user_${telegramId}`);
-      if (result && result.secure_url) {
-        imagePath = result.secure_url; // store Cloudinary URL
+        // Upload to Cloudinary
+        const result = await uploadImage(buffer, "users", `user_${telegramId}`);
+        if (result && result.secure_url) {
+          imagePath = result.secure_url;
+        }
+      } catch (uploadErr) {
+        console.error("Image upload failed, skipping...", uploadErr.message);
       }
     }
 
@@ -55,16 +64,23 @@ const handleStart = async (user, botInstance, chatId) => {
       ? `${user.first_name} ${user.last_name}`
       : user.first_name;
 
-    // Send greeting message
-    await botInstance.sendMessage(chatId, `👋 Hi ${fullName}! Profile synced.`);
+    // 🎨 DESIGN UPDATE: Friendly Welcome Message using HTML
+    const welcomeMessage = `
+<b>🚀 Welcome back, ${fullName}!</b>
 
-    // Send WebApp button
-    await botInstance.sendMessage(chatId, "Open WebApp 👇", {
+Your profile has been successfully synced with our servers. You can now access your dashboard directly from here.
+
+👇 <b>Tap the button below to start:</b>
+    `;
+
+    // Send WebApp button with updated text
+    await botInstance.sendMessage(chatId, welcomeMessage, {
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: "Open App",
+              text: "✨ Open Dashboard",
               web_app: {
                 url: `${process.env.FRONTEND_URL}/login?telegram_id=${chatId}`
               }
@@ -73,16 +89,13 @@ const handleStart = async (user, botInstance, chatId) => {
         ]
       }
     });
-    
 
     console.log("Saved user profile:", existingUser);
 
   } catch (error) {
-    console.error("handleStart error:", error.message); // log error message
-    console.error(error); // full stack trace
-    await botInstance.sendMessage(chatId, "⚠️ Something went wrong!");
+    console.error("handleStart error:", error.message);
+    await botInstance.sendMessage(chatId, "⚠️ <b>Oops!</b> Something went wrong while syncing your profile. Please try typing /start again.", { parse_mode: "HTML" });
   }
-  
 };
 
 
@@ -100,18 +113,33 @@ const sendOtp = async (req, res, botInstance) => {
 
     const user = await User.findOne({ telegram_id: telegramId });
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User account not found." });
     }
 
     const otp = generateOtp();
     otpStore.set(telegramId, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
 
-    await botInstance.sendMessage(telegramId, `🔑 Your OTP code is: ${otp} (valid 5 minutes)`);
+    // 🎨 DESIGN UPDATE: Secure & Copy-friendly OTP Message
+    // The <code> tag makes the OTP monospace and clickable (tap to copy) on Telegram
+    const otpMessage = `
+🔐 <b>Login Verification</b>
 
-    return res.status(200).json({ success: true, message: "OTP sent to your Telegram" });
+Here is your One-Time Password to log in:
+
+<code>${otp}</code>
+
+<i>(Tap the code to copy)</i>
+
+⏳ <b>Valid for:</b> 5 minutes
+⚠️ <b>Note:</b> Do not share this code with anyone, including our support team.
+    `;
+
+    await botInstance.sendMessage(telegramId, otpMessage, { parse_mode: "HTML" });
+
+    return res.status(200).json({ success: true, message: "OTP sent successfully to Telegram." });
   } catch (err) {
     console.error("sendOtp error:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: "Internal server error. Please try again." });
   }
 };
 
@@ -124,22 +152,22 @@ const verifyOtp = async (req, res) => {
     const otp = req.body.otp;
 
     if (!telegramId || !otp) {
-      return res.status(400).json({ success: false, message: "telegram_id and otp required" });
+      return res.status(400).json({ success: false, message: "Both Telegram ID and OTP are required." });
     }
 
     const record = otpStore.get(telegramId);
 
     if (!record) {
-      return res.status(400).json({ success: false, message: "No OTP requested" });
+      return res.status(400).json({ success: false, message: "No OTP request found. Please request a new code." });
     }
 
     if (record.expiresAt < Date.now()) {
       otpStore.delete(telegramId);
-      return res.status(400).json({ success: false, message: "OTP expired" });
+      return res.status(400).json({ success: false, message: "This OTP has expired. Please request a new one." });
     }
 
     if (record.otp.toString() !== otp.toString()) {
-      return res.status(400).json({ success: false, message: "Invalid OTP" });
+      return res.status(400).json({ success: false, message: "Invalid OTP. Please check the code and try again." });
     }
 
     const user = await User.findOne({ telegram_id: telegramId });
@@ -149,12 +177,19 @@ const verifyOtp = async (req, res) => {
       { expiresIn: "7d" }
     );
 
+    // Clear OTP after success
     otpStore.delete(telegramId);
 
-    return res.status(200).json({ success: true, data: user, token });
+    return res.status(200).json({ 
+      success: true, 
+      message: "Login successful!",
+      data: user, 
+      token 
+    });
+
   } catch (err) {
     console.error("verifyOtp error:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: "Authentication failed due to a server error." });
   }
 };
 
@@ -162,7 +197,7 @@ const logoutUser = (req, res) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    return res.status(401).json({ success: false, message: "No token provided" });
+    return res.status(401).json({ success: false, message: "No authentication token provided." });
   }
 
   const token = authHeader.split(" ")[1];
@@ -170,8 +205,7 @@ const logoutUser = (req, res) => {
   // Add token to blacklist
   addTokenToBlacklist(token);
 
-  return res.json({ success: true, message: "Logged out successfully" });
+  return res.json({ success: true, message: "You have been logged out successfully." });
 };
-
 
 module.exports = { handleStart, sendOtp, verifyOtp, logoutUser };
