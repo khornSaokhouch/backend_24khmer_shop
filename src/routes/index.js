@@ -9,6 +9,7 @@ const categoryRoutes = require("./category");
 const eventRoutes = require("./event");
 const productRoutes = require("./product");
 const favoriteRoutes = require("./favorites");
+const cartRoutes = require("./cart");
 
 // Mount routes
 router.use("/auth", authRoutes);
@@ -18,5 +19,6 @@ router.use("/categories", categoryRoutes);
 router.use("/events", eventRoutes);
 router.use("/products", productRoutes);
 router.use("/favorites", favoriteRoutes);
+router.use("/cart", cartRoutes);
 
 module.exports = router;

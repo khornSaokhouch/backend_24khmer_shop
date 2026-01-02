@@ -22,21 +22,21 @@ app.use(
 //   "https://forntend-24khmer-shop.vercel.app"
 // ];
 
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       // allow requests with no origin (like Postman or server-to-server)
-//       if (!origin) return callback(null, true);
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like Postman or server-to-server)
+      if (!origin) return callback(null, true);
 
-//       if (allowedOrigins.indexOf(origin) !== -1) {
-//         callback(null, true);
-//       } else {
-//         callback(new Error("Not allowed by CORS"));
-//       }
-//     },
-//     credentials: true,
-//   })
-// );
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 
 // ---------------- Body Parser ----------------
